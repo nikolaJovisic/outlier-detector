@@ -1,16 +1,12 @@
 import datetime
 from preprocess import preprocess_scan
 import os
-import matplotlib.pyplot as plt
 import cv2
 import tensorflow as tf
-from numpy.linalg import norm
 import einops
 import numpy as np
-from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from sklearn.datasets import make_blobs
 from scipy.spatial.distance import cdist
 
 path = "data/IORS/png"
