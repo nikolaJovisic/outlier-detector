@@ -14,7 +14,6 @@ LOG_DIR="."
 
 # Find the latest log file
 CLASS_FILE=$(ls -t $LOG_DIR/log_*.txt | head -n 1)
-echo $CLASS_FILE
 
 # Check if the class file exists
 if [ ! -f "$CLASS_FILE" ]; then
@@ -23,7 +22,7 @@ if [ ! -f "$CLASS_FILE" ]; then
 fi
 
 # Define the base directory for the images
-BASE_DIR="../data/IORS/png"
+BASE_DIR="/home/jovisic/projects/outlier-detector/data"
 
 # Read the class file and extract images for the specified class
 IMAGES=()
@@ -52,4 +51,6 @@ if [ ${#IMAGES[@]} -eq 0 ]; then
 fi
 
 # Open all images in the specified class using eog
-echo "${IMAGES[@]}" | xargs eog 
+for image in "${IMAGES[@]}"; do
+      echo "$image"
+done      
