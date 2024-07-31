@@ -1,22 +1,27 @@
 import datetime
-from preprocess import preprocess_scan
 import os
 import cv2
-import tensorflow as tf
+import sys
 import einops
 import numpy as np
 from sklearn.decomposition import PCA
+import json
 from sklearn.cluster import KMeans
 from scipy.spatial.distance import cdist
 
-path = "data/IORS/png"
-
-model = tf.keras.applications.MobileNetV2(
-    include_top=False, weights="imagenet", input_shape=(256, 256, 3), pooling="avg"
-)
+path = "data"
+run_id = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
 
 
-def clusterize(folder_path, n=None, c="black"):
+def embed(folder_path, n=None, c="black"):
+    import pydicom
+    from preprocess import preprocess_scan
+    import tensorflow as tf
+    
+    model = tf.keras.applications.MobileNetV2(
+        include_top=False, weights="imagenet", input_shape=(256, 256, 3), pooling="avg"
+    )
+
     i = n if n is not None else float("inf")
     vectors = []
     file_labels = []
@@ -25,9 +30,13 @@ def clusterize(folder_path, n=None, c="black"):
             break
         i -= 1
         file_labels.append(entity.name)
+        print(entity.path)
         path = os.path.realpath(entity.path)
-        image = cv2.imread(path)[..., 0]
+        print(path)
+        image = pydicom.dcmread(path).pixel_array
         image, _ = preprocess_scan(image)
+        image = image.astype(np.float32)
+        image = (image - image.min()) / (image.max() - image.min()) * 255.0
         image = einops.repeat(image, "h w -> h w c", c=3)
         image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
         image = cv2.resize(image, (256, 256))
@@ -36,7 +45,14 @@ def clusterize(folder_path, n=None, c="black"):
         vectors.append(feature_vector)
 
     features = np.array(vectors)
-    pca = PCA(n_components=16)
+    os.mkdir(f'runs/{run_id}')
+    np.save(f'runs/{run_id}/features.npy', features)
+    with open(f'runs/{run_id}/names.json', 'w') as file:
+        json.dump(file_labels, file)
+    return features, file_labels
+
+def clusterize(features, file_labels):
+    pca = PCA(n_components=6)
     X = pca.fit_transform(features)
 
     kmeans = KMeans(n_clusters=4, random_state=42)
@@ -63,10 +79,9 @@ def clusterize(folder_path, n=None, c="black"):
             class_dict[class_].append(string)
     return class_dict, outlier_list
 
-
 def write_report(class_dict, outlier_list):
     with open(
-        f"cluster_logs/log_{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.txt",
+        f"cluster_logs/log_{run_id}.txt",
         "w",
     ) as file:
         # Write outliers
@@ -82,5 +97,16 @@ def write_report(class_dict, outlier_list):
                 file.write(f"{item}\n")
             file.write("\n")
 
+def main(arg=None):
+    if arg:
+        with open(f'{arg}/names.json', 'r') as file:
+            names = json.load(file)
+        write_report(*clusterize(np.load(f'{arg}/features.npy'), names))
+    else:
+        write_report(*clusterize(*embed(path, n=10)))
 
-write_report(*clusterize(path))
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        main(sys.argv[1])
+    else:
+        main()
